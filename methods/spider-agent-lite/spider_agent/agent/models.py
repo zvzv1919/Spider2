@@ -4,8 +4,11 @@ import logging
 import os
 import re
 import time
+import uuid
+from datetime import datetime
 from http import HTTPStatus
 from io import BytesIO
+from pathlib import Path
 
 from openai import AzureOpenAI
 from typing import Dict, List, Optional, Tuple, Any, TypedDict
@@ -16,513 +19,217 @@ import openai
 import requests
 import tiktoken
 import signal
+import os
+import time
+from typing import Optional, List, Dict, Any
+from dotenv import load_dotenv
+from openai import OpenAI, RateLimitError, APITimeoutError, APIConnectionError
 
 logger = logging.getLogger("api-llms")
 
-
-def call_llm(payload):
-    model = payload["model"]
-    stop = ["Observation:","\n\n\n\n","\n \n \n"]
-    if model.startswith("gpt"):
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"
-        }
-        logger.info("Generating content with GPT model: %s", model)
-        
-
-        for i in range(3):
-            try:
-                response = requests.post(
-                            "https://api.openai.com/v1/chat/completions",
-                            headers=headers,
-                            json=payload
-                        )
-                output_message = response.json()['choices'][0]['message']['content']
-                # logger.info(f"Input: \n{payload['messages']}\nOutput:{response}")
-                return True, output_message
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                if hasattr(e, 'response') and e.response is not None:
-                    error_info = e.response.json()  
-                    code_value = error_info['error']['code']
-                    if code_value == "content_filter":
-                        if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-                            payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                    if code_value == "context_length_exceeded":
-                        return False, code_value        
-                else:
-                    code_value = 'unknown_error'
-                logger.error("Retrying ...")
-                time.sleep(4 * (2 ** (i + 1)))
-        return False, code_value
-    
-    elif model.startswith("o1"):
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"
-        }
-        logger.info("Generating content with GPT model: %s", model)
-        
-        messages = payload["messages"]
-        top_p = payload["top_p"]
-        temperature = payload["temperature"]
-            
-            
-        o1_messages = []
-
-        for i, message in enumerate(messages):
-            o1_message = {
-                "role": message["role"] if message["role"] != "system" else "user",
-                "content": ""
-            }
-            for part in message["content"]:
-                o1_message['content'] = part['text'] if part['type'] == "text" else ""
-                
-                o1_messages.append(o1_message)
-
-        payload["messages"] = o1_messages
-        payload["max_completion_tokens"] = 10000
-        del payload['max_tokens']
-        del payload["temperature"]
-        del payload["top_p"]
-
-        for i in range(3):
-            try:
-                response = requests.post(
-                            "https://api.openai.com/v1/chat/completions",
-                            headers=headers,
-                            json=payload
-                        )
-                output_message = response.json()['choices'][0]['message']['content']
-                # logger.info(f"Input: \n{payload['messages']}\nOutput:{response}")
-                return True, output_message
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                logger.error("Retrying ...")
-                time.sleep(10 * (2 ** (i + 1)))
-        return False, code_value
-
-    elif model.startswith("azure"):
-        client = AzureOpenAI(
-            api_key = os.environ['AZURE_API_KEY'],  
-            api_version = "2024-02-15-preview",
-            azure_endpoint = os.environ['AZURE_ENDPOINT']
-            )
-        model_name = model.split("/")[-1]
-        for i in range(3):
-            try:
-                response = client.chat.completions.create(model=model_name,messages=payload['messages'], max_tokens=payload['max_tokens'], top_p=payload['top_p'], temperature=payload['temperature'], stop=stop)
-                response = response.choices[0].message.content
-                # logger.info(f"Input: \n{payload['messages']}\nOutput:{response}")
-                return True, response
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                error_info = e.response.json()  
-                code_value = error_info['error']['code']
-                if code_value == "content_filter":
-                    if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-                        payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                if code_value == "context_length_exceeded":
-                    return False, code_value        
-                logger.error("Retrying ...")
-                time.sleep(10 * (2 ** (i + 1)))
-        return False, code_value
-        
-    elif model.startswith("claude"):
-        messages = payload["messages"]
-        max_tokens = payload["max_tokens"]
-        top_p = payload["top_p"]
-        temperature = payload["temperature"]
-
-        gemini_messages = []
-
-        for i, message in enumerate(messages):
-            gemini_message = {
-                "role": message["role"],
-                "content": []
-            }
-            assert len(message["content"]) in [1, 2], "One text, or one text with one image"
-            for part in message["content"]:
-
-                if part['type'] == "image_url":
-                    image_source = {}
-                    image_source["type"] = "base64"
-                    image_source["media_type"] = "image/png"
-                    image_source["data"] = part['image_url']['url'].replace("data:image/png;base64,", "")
-                    gemini_message['content'].append({"type": "image", "source": image_source})
-
-                if part['type'] == "text":
-                    gemini_message['content'].append({"type": "text", "text": part['text']})
-
-            gemini_messages.append(gemini_message)
-        
-        if gemini_messages[0]['role'] == "system":
-            gemini_system_message_item = gemini_messages[0]['content'][0]
-            gemini_messages[1]['content'].insert(0, gemini_system_message_item)
-            gemini_messages.pop(0)
+# LLM interaction logging directory
+LLM_LOG_DIR = Path("/data/zvzv1919/Spider2/methods/spider-agent-lite/logs/llm")
+LLM_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
-        headers = {
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {os.environ["GEMINI_API_KEY"]}',
-            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-            'Content-Type': 'application/json'
-        }  
-        
-        payload = json.dumps({"model": model,"messages": gemini_messages,"max_tokens": max_tokens,"temperature": temperature,"top_p": top_p})
+def _log_llm_interaction(
+    messages: List[Dict[str, Any]],
+    model: str,
+    temperature: float,
+    max_tokens: Optional[int],
+    top_p: float,
+    response: Optional[str] = None,
+    attempt: int = 1,
+    **kwargs: Any,
+) -> None:
+    """
+    Log an LLM interaction to a unique file to avoid race conditions.
+    Each interaction gets its own file with a timestamp and UUID.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    unique_id = uuid.uuid4().hex[:8]
+    log_filename = f"{timestamp}_{unique_id}.json"
+    log_path = LLM_LOG_DIR / log_filename
+
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "model": model,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "top_p": top_p,
+        "attempt": attempt,
+        "messages": messages,
+        "extra_kwargs": {k: str(v) for k, v in kwargs.items()},  # Convert to string for JSON serialization
+        "response": response,
+    }
+
+    try:
+        with open(log_path, "w", encoding="utf-8") as f:
+            json.dump(log_entry, f, indent=2, ensure_ascii=False, default=str)
+    except Exception as e:
+        logger.warning(f"Failed to log LLM interaction to {log_path}: {e}")
 
 
-        
-        for i in range(3):
-            try:
-                response = requests.request("POST", "https://api2.aigcbest.top/v1/chat/completions", headers=headers, data=payload)
-                logger.info(f"response_code {response.status_code}")
-                if response.status_code == 200:
-                    return True, response.json()['choices'][0]['message']['content']
-                else:
-                    error_info = response.json()  
-                    code_value = error_info['error']['code']
-                    if code_value == "content_filter":
-                        if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-                            payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                    if code_value == "context_length_exceeded":
-                        return False, code_value
-                    logger.error("Retrying ...")
-                    time.sleep(10 * (2 ** (i + 1)))
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                time.sleep(10 * (2 ** (i + 1)))
-                code_value = "context_length_exceeded"
-        return False, code_value
-                           
+_client: Optional[OpenAI] = None
 
-    elif model.startswith("mixtral"):
-        messages = payload["messages"]
-        max_tokens = payload["max_tokens"]
-        top_p = payload["top_p"]
-        temperature = payload["temperature"]
 
-        mistral_messages = []
+def _get_retry_after(exception, default_backoff: float) -> float:
+    """
+    Extract retry-after value from API exception headers.
+    Returns the header value if present, otherwise returns default_backoff.
+    """
+    try:
+        # OpenAI exceptions have a response attribute with headers
+        if hasattr(exception, 'response') and exception.response is not None:
+            headers = exception.response.headers
+            retry_after = headers.get('retry-after') or headers.get('Retry-After')
+            if retry_after:
+                # retry-after can be seconds (int) or HTTP date string
+                # Most APIs use seconds for rate limits
+                return float(retry_after)
+    except (ValueError, AttributeError, TypeError):
+        pass  # Silently fall back to default
+    return default_backoff
 
-        for i, message in enumerate(messages):
-            mistral_message = {
-                "role": message["role"],
-                "content": ""
-            }
 
-            for part in message["content"]:
-                mistral_message['content'] = part['text'] if part['type'] == "text" else ""
+def _build_client(api_key: Optional[str] = None, base_url: Optional[str] = None) -> OpenAI:
+    """
+    Construct an OpenAI client using environment variables by default.
 
-            mistral_messages.append(mistral_message)
+    - Reads OPENAI_API_KEY (required)
+    - Reads OPENAI_BASE_URL (optional; useful for gateways/Azure-compatible endpoints)
+    """
+    load_dotenv("/data/zvzv1919/Spider2/methods/spider-agent-lite/.env")
 
-        client = Groq(
-            api_key=os.environ.get("GROQ_API_KEY"),
+    resolved_api_key = api_key or os.getenv("OPENAI_API_KEY")
+    if not resolved_api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. Provide it in your environment or .env file."
         )
 
-        for i in range(2):
-            try:
-                logger.info("Generating content with model: %s", model)
-                response = client.chat.completions.create(
-                    messages=mistral_messages,
-                    model=model,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
-                    temperature=temperature,
-                    stop = stop
-                )
-                return True, response.choices[0].message.content
-                
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                time.sleep(10 * (2 ** (i + 1)))
-                if hasattr(e, 'response'):
-                    error_info = e.response.json()  
-                    code_value = error_info['error']['code']
-                    if code_value == "content_filter":
-                        if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-                            payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                    if code_value == "context_length_exceeded":
-                        return False, code_value        
-                else:
-                    code_value = ""
-                logger.error("Retrying ...") 
+    resolved_base_url = base_url or os.getenv("OPENAI_BASE_URL")
 
-        return False, code_value
+    # Configure client-level retries and timeout via environment variables
+    max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+    timeout = float(os.getenv("OPENAI_TIMEOUT", "60"))
+
+    if resolved_base_url:
+        return OpenAI(
+            api_key=resolved_api_key,
+            base_url=resolved_base_url,
+            max_retries=max_retries,
+            timeout=timeout,
+        )
+    return OpenAI(api_key=resolved_api_key, max_retries=max_retries, timeout=timeout)
+
+
+def get_client(api_key: Optional[str] = None, base_url: Optional[str] = None) -> OpenAI:
+    """Return a cached OpenAI client instance, creating it on first use."""
+    global _client
+    if _client is None or api_key or base_url:
+        _client = _build_client(api_key=api_key, base_url=base_url)
+    return _client
+
+def chat(
+    messages: List[Dict[str, str]],
+    model: Optional[str] = None,
+    temperature: float = 0.2,
+    max_tokens: Optional[int] = None,
+    max_retries: int = 3,
+    top_p: float = 0.9,
+    **kwargs: Any,
+) -> Tuple[bool, str]:
+    """
+    Minimal helper to get a single string response from Chat Completions.
+
+    Parameters
+    - messages: [{"role": "user"|"system"|"assistant", "content": "..."}, ...]
+    - model: overrides OPENAI_MODEL if provided
+    - temperature, max_tokens: forwarded to OpenAI
+    - max_retries: number of retries for rate limit/timeout errors (default 5)
+    - **kwargs: forwarded to OpenAI chat.completions.create
+
+    Returns
+    - Tuple of (success: bool, content: str)
+      - On success: (True, assistant message content)
+      - On failure: (False, error code)
+    """
+    client = get_client()
+    chosen_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    code_value = "unknown_error"
+
+    for attempt in range(max_retries):
+        try:
+            resp = client.chat.completions.create(
+                model=chosen_model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                **kwargs,
+            )
+            response_content = resp.choices[0].message.content or ""
+            
+            # Log successful interaction
+            _log_llm_interaction(
+                messages=messages,
+                model=chosen_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                response=response_content,
+                attempt=attempt + 1,
+                **kwargs,
+            )
+            
+            return True, response_content
         
-    # elif model.startswith("llama"):
-    #     messages = payload["messages"]
-    #     max_tokens = payload["max_tokens"]
-    #     top_p = payload["top_p"]
-    #     temperature = payload["temperature"]
-
-    #     llama_messages = []
-
-    #     for i, message in enumerate(messages):
-    #         llama_message = {
-    #             "role": message["role"],
-    #             "content": ""
-    #         }
-    #         for part in message["content"]:
-    #             llama_message['content'] = part['text'] if part['type'] == "text" else ""
-    #             llama_messages.append(llama_message)   
-    #         llama_messages.append(llama_message)
-
-    #     for i in range(3):
-    #         try:
-    #             logger.info("Generating content with model: %s", model)
-    #             response = dashscope.Generation.call(
-    #                 model=model,
-    #                 messages=llama_messages,
-    #                 result_format="message",
-    #                 max_length=max_tokens,
-    #                 top_p=top_p,
-    #                 temperature=temperature,
-    #                 stop = stop
-    #             )
-    #             import pdb; pdb.set_trace()
-    #             return True, response['output']['choices'][0]['message']['content']
-
-    #         except Exception as e:
-    #             logger.error("Failed to call LLM: " + str(e))
-    #             time.sleep(4 * (2 ** (i + 1)))
-    #             if hasattr(e, 'response'):
-    #                 error_info = e.response.json()  
-    #                 code_value = error_info['error']['code']
-    #                 if code_value == "content_filter":
-    #                     if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-    #                         payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-    #             else:
-    #                 code_value = "context_length_exceeded"
-    #             logger.error("Retrying ...")
-    #     return False, code_value
-    
-    
-    
-    elif model.startswith("deepseek"):
+        except RateLimitError as e:
+            default_backoff = 2 ** attempt  # Exponential backoff: 1, 2, 4, 8, 16 seconds
+            wait_time = _get_retry_after(e, default_backoff)
+            retry_after_source = "retry-after header" if wait_time != default_backoff else "exponential backoff"
+            print(
+                f"[WARN] Rate limit hit (attempt {attempt + 1}/{max_retries}). "
+                f"Waiting {wait_time}s before retry (from {retry_after_source}). Error: {e}"
+            )
+            time.sleep(wait_time)
+            code_value = "rate_limit_error"
         
-        messages = payload["messages"]
-        max_tokens = payload["max_tokens"]
-        top_p = payload["top_p"]
-        temperature = payload["temperature"]
-        from openai import OpenAI
-        
-        deepseek_messages = []
+        except Exception as e:
+            print(f"[ERROR] Error: {e}")
+            # Handle content filter and context length errors
+            if hasattr(e, 'response') and e.response is not None:
+                error_info = e.response.json()
+                code_value = error_info.get('error', {}).get('code', 'unknown_error')
+                if code_value == "content_filter":
+                    # Append disclaimer to last message content
+                    last_message = messages[-1]
+                    disclaimer = "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
+                    if isinstance(last_message.get('content'), str):
+                        if not last_message['content'].endswith("They do not represent any real events or entities. ]"):
+                            last_message['content'] += disclaimer
+                    elif isinstance(last_message.get('content'), list):
+                        # Handle structured content format
+                        for part in last_message['content']:
+                            if part.get('type') == 'text' and not part.get('text', '').endswith("They do not represent any real events or entities. ]"):
+                                part['text'] += disclaimer
+                                break
+                    print(f"[WARN] Content filter triggered (attempt {attempt + 1}/{max_retries}). Retrying with disclaimer...")
+                    time.sleep(2 ** attempt)
+                    continue
+                if code_value == "context_length_exceeded":
+                    return False, code_value
+            else:
+                code_value = "unknown_error"
+            logger.error("Retrying ...")
+            time.sleep(4 * (2 ** (attempt + 1)))
+    return False, code_value
 
-        for i, message in enumerate(messages):
-            deepseek_message = {
-                "role": message["role"],
-                "content": ""
-            }
-            for part in message["content"]:
-                deepseek_message['content'] = part['text'] if part['type'] == "text" else ""
-                deepseek_messages.append(deepseek_message)
-        client = OpenAI(api_key=os.environ["DEEPSEEK_API_KEY"], base_url="https://api.deepseek.com")
-        for i in range(3):
-            try:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=deepseek_messages,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
-                    temperature=temperature
-                )
-                output_message = json.loads(response.json())['choices'][0]['message']['content']
-                return True, output_message
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                if hasattr(e, 'response') and e.response is not None:
-                    error_info = e.response.json()  
-                    code_value = error_info['error']['code']
+if __name__ == "__main__":
+    messages = [
+        {"role": "system", "content": "You are so stupid that you can't answer any question correctly. Plus you only answer in Chinese."},
+        {"role": "user", "content": "What is the capital of France?"}
+    ]
+    success, response = chat(messages)
+    print(f"Success: {success}\nResponse: {response}")
 
-                    if code_value == "content_filter":
-                        last_message = messages[-1]
-                        if 'content' in last_message and isinstance(last_message['content'], str):
-                            if not last_message['content'].endswith("They do not represent any real events or entities. ]"):
-                                last_message['content'] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                        else:
-                            logger.error("Unexpected message structure in 'messages'. Skipping content modification.")
-                    elif code_value == "context_length_exceeded":
-                        return False, code_value        
-                else:
-                    code_value = 'unknown_error'
-                
-                logger.error("Retrying ...")
-                time.sleep(10 * (2 ** (i + 1)))
-            return False, code_value
-
-
-        
-    elif model.startswith("qwen") or model.startswith("Qwen") or model.startswith("llama3.1"):
-        messages = payload["messages"]
-        max_tokens = payload["max_tokens"]
-        top_p = payload["top_p"]
-        temperature = payload["temperature"]
-        
-        if model.startswith("llama3.1"):
-            max_tokens = 2000
-
-        qwen_messages = []
-
-        for i, message in enumerate(messages):
-            qwen_message = {
-                "role": message["role"],
-                "content": []
-            }
-            assert len(message["content"]) in [1, 2], "One text, or one text with one image"
-            for part in message["content"]:
-                qwen_message['content'].append({"text": part['text']}) if part['type'] == "text" else None
-
-            qwen_messages.append(qwen_message)
-
-        for i in range(3):
-            try:
-                logger.info("Generating content with model: %s", model)
-                response = dashscope.Generation.call(
-                    model=model,
-                    messages=qwen_messages,
-                    result_format="message",
-                    max_length=max_tokens,
-                    top_p=top_p,
-                    temperature=temperature,
-                    stop = stop
-                )
-                return True, response['output']['choices'][0]['message']['content']
-
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                time.sleep(3 * (2 ** (i + 1)))
-                if hasattr(e, 'response'):
-                    error_info = e.response.json()  
-                    code_value = error_info['error']['code']
-                    if code_value == "content_filter":
-                        if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-                            payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                else:
-                    code_value = "context_length_exceeded"
-                logger.error("Retrying ...")
-        return False, code_value
-
-
-        
-    elif model.startswith("codellama") or model.startswith("mistralai"):
-        messages = payload["messages"]
-        max_tokens = payload["max_tokens"]
-        if model == "codellama/CodeLlama-70b-Instruct-hf":
-            max_tokens = 800
-        top_p = payload["top_p"]
-        temperature = payload["temperature"]
-
-        mistral_messages = []
-
-        for i, message in enumerate(messages):
-            mistral_message = {
-                "role": message["role"],
-                "content": ""
-            }
-
-            for part in message["content"]:
-                mistral_message['content'] = part['text'] if part['type'] == "text" else ""
-
-            mistral_messages.append(mistral_message)
-
-        from openai import OpenAI
-
-        client = OpenAI(api_key=os.environ["TOGETHER_API_KEY"],
-                        base_url='https://api.together.xyz',
-                        )
-
-        for i in range(3):
-            try:
-                logger.info("Generating content with model: %s", model)
-                response = client.chat.completions.create(
-                    messages=mistral_messages,
-                    model=model,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
-                    temperature=temperature
-                )
-                return True, response.choices[0].message.content
-                
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                time.sleep(10 * (2 ** (i + 1)))
-                # if hasattr(e, 'response'):
-                #     error_info = e.response  
-                #     code_value = error_info['error']['param']
-                #     if "content" in code_value:
-                #         if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-                #             payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                #     if code_value == "max_tokens":
-                #         return False, code_value        
-                # else:
-                code_value = "context_length_exceeded"
-                logger.error("Retrying ...")
-
-        return False, code_value
-
-
-
-    elif model == "gemini-1.5-pro-latest":
-        messages = payload["messages"]
-        max_tokens = payload["max_tokens"]
-        top_p = payload["top_p"]
-        temperature = payload["temperature"]
-
-        gemini_messages = []
-
-        for i, message in enumerate(messages):
-            gemini_message = {
-                "role": message["role"],
-                "content": []
-            }
-            assert len(message["content"]) in [1, 2], "One text, or one text with one image"
-            for part in message["content"]:
-
-                if part['type'] == "image_url":
-                    image_source = {}
-                    image_source["type"] = "base64"
-                    image_source["media_type"] = "image/png"
-                    image_source["data"] = part['image_url']['url'].replace("data:image/png;base64,", "")
-                    gemini_message['content'].append({"type": "image", "source": image_source})
-
-                if part['type'] == "text":
-                    gemini_message['content'].append({"type": "text", "text": part['text']})
-
-            gemini_messages.append(gemini_message)
-
-        headers = {
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {os.environ["GEMINI_API_KEY"]}',
-            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-            'Content-Type': 'application/json'
-        }  
-        
-        payload = json.dumps({"model": model,"messages": gemini_messages,"max_tokens": max_tokens,"temperature": temperature,"top_p": top_p})
-
-
-        
-        for i in range(3):
-            try:
-                response = requests.request("POST", "https://api2.aigcbest.top/v1/chat/completions", headers=headers, data=payload)
-                logger.info(f"response_code {response.status_code}")
-                if response.status_code == 200:
-                    return True, response.json()['choices'][0]['message']['content']
-                else:
-                    error_info = response.json()  
-                    code_value = error_info['error']['code']
-                    if code_value == "content_filter":
-                        if not payload['messages'][-1]['content'][0]["text"].endswith("They do not represent any real events or entities. ]"):
-                            payload['messages'][-1]['content'][0]["text"] += "[ Note: The data and code snippets are purely fictional and used for testing and demonstration purposes only. They do not represent any real events or entities. ]"
-                    if code_value == "context_length_exceeded":
-                        return False, code_value
-                    logger.error("Retrying ...")
-                    time.sleep(10 * (2 ** (i + 1)))
-            except Exception as e:
-                logger.error("Failed to call LLM: " + str(e))
-                time.sleep(10 * (2 ** (i + 1)))
-                code_value = "context_length_exceeded"
-        return False, code_value
-                           
-                    
- 

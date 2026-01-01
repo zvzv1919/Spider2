@@ -11,7 +11,7 @@ from typing import Dict, List
 from spider_agent.agent.prompts import BIGQUERY_SYSTEM, LOCAL_SYSTEM, DBT_SYSTEM, SNOWFLAKE_SYSTEM, REFERENCE_PLAN_SYSTEM
 from spider_agent.agent.action import Action, Bash, Terminate, CreateFile, EditFile, LOCAL_DB_SQL, BIGQUERY_EXEC_SQL, SNOWFLAKE_EXEC_SQL, BQ_GET_TABLES, BQ_GET_TABLE_INFO, BQ_SAMPLE_ROWS
 from spider_agent.envs.spider_agent import Spider_Agent_Env
-from spider_agent.agent.models import call_llm
+from spider_agent.agent.models import chat
 
 
 from openai import AzureOpenAI
@@ -115,13 +115,13 @@ class PromptAgent:
                     }
                 ]
             })  
-            status, response = call_llm({
-                "model": self.model,
-                "messages": messages,
-                "max_tokens": self.max_tokens,
-                "top_p": self.top_p,
-                "temperature": self.temperature
-            })
+            status, response = chat(
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
+                temperature=self.temperature
+            )
             response = response.strip()
             if not status:
                 if response in ["context_length_exceeded","rate_limit_exceeded","max_tokens","unknown_error"]:
