@@ -1,0 +1,31 @@
+Database Engine:
+SQLite
+Database Schema: {Database Schema}
+This schema describes the database's structure, including tables, columns, primary keys,
+foreign keys, and any relevant relationships or constraints.
+Question:
+{evidence + question}
+Instructions:
+- Make sure you only output the information that is asked in the question. If the question asks
+for a specific column, make sure to only include that column in the SELECT clause, nothing
+more.
+- The generated query should return all of the information asked in the question without any
+missing or extra information.
+- Before generating the final SQL query, please think through the steps of how to write the
+query.
+Output Format:
+Please provide a detailed chain-of-thought reasoning process and include your thought
+process within '<think>' tags. Your final answer should be enclosed within '<answer>' tags.
+Ensure that your SQL query follows the correct syntax and is formatted as follows:
+```sql
+– Your SQL query here
+```
+Example format:
+<think> Step-by-step reasoning, including self-reflection and corrections if necessary.
+[Limited by 4K tokens] </think>
+<answer> Summary of the thought process leading to the final SQL query. [Limited by 1K
+tokens]
+```sql
+Correct SQL query here
+```
+</answer>
