@@ -149,43 +149,6 @@ def get_snowflake_sql_result(sql_query, is_save, save_dir=None, file_name="resul
         print("Error occurred while fetching data: ", e)  
         return False, str(e)
 
-
-def get_bigquery_sql_result(sql_query, is_save, credential_path, save_dir=None, file_name="result.csv", timeout=90):  
-    """
-    is_save = True, output a 'result.csv'
-    if_save = False, output a string
-    """
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credential_path
-    client = bigquery.Client()
-
-    try:
-        def execute_query():
-            query_job = client.query(sql_query)
-            return query_job.result().to_dataframe()
-        
-        results = run_with_timeout(execute_query, timeout)
-
-        if results is None:
-            print(f"Query timed out after {timeout} seconds.")
-            return False, 'timed out'
-
-        if results.empty:
-            print("No data found for the specified query.")
-            results.to_csv(os.path.join(save_dir, file_name), index=False)
-            return None, None
-        else:
-            if is_save:
-                results.to_csv(os.path.join(save_dir, file_name), index=False)
-                return None, None
-            else:
-                value = results.iat[0, 0]
-                return value, None
-    except Exception as e:
-        print("Error occurred while fetching data: ", e)  
-        return False, str(e)
-    return True, None
-      
-
 def get_sqlite_result(db_path, query, save_dir=None, file_name="result.csv", chunksize=500):
     conn = sqlite3.connect(db_path)
     memory_conn = sqlite3.connect(':memory:')
