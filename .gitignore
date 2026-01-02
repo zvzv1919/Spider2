@@ -1,3 +1,11 @@
+# Python / uv
+.venv/
+dist/
+build/
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
 
 spider2-dbt/evaluation_suite/*
 spider2-dbt/release_spider2/spider2c.jsonl
@@ -140,4 +148,5 @@ spider2-lite/resource/databases/spider2-localdb
 # Ignore any folder named 'credentials'
 credentials/
 **/credentials/
+**/*_credential.json
 

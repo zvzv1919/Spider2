@@ -1,0 +1,163 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spider2"
+version = "0.1.0"
+description = "Spider 2.0: Evaluating Language Models on Real-World Enterprise Text-to-SQL Workflows"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Spider2 Team" }
+]
+keywords = ["text-to-sql", "llm", "benchmark", "sql", "database"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Database",
+]
+
+dependencies = [
+    # Core ML/LLM
+    "openai>=1.31.0",
+    "transformers>=4.28.0",
+    "tiktoken>=0.5.0",
+    "langchain>=0.1.0",
+    "tenacity>=8.0.0",
+    
+    # Database connectors
+    "duckdb>=1.0.0",
+    "google-cloud-bigquery>=3.18.0",
+    "snowflake-connector-python>=3.0.0",
+    "db-dtypes>=1.2.0",
+    
+    # Data processing
+    "pandas>=2.0.0",
+    "numpy>=1.23.0",
+    
+    # Utilities
+    "rich>=13.0.0",
+    "tqdm>=4.60.0",
+    "diskcache>=5.6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+
+agent = [
+    # Spider Agent dependencies
+    "docker>=6.0.0",
+    "flaml>=2.0.0",
+    "gymnasium>=0.29.0",
+    "chromadb>=0.4.0",
+    "pypdf>=3.0.0",
+    "unstructured>=0.10.0",
+    "fuzzywuzzy>=0.18.0",
+    "python-Levenshtein>=0.20.0",
+    "playwright>=1.40.0",
+    "minify-html>=0.15.0",
+    "rpyc>=6.0.0",
+    "mysql-connector-python>=8.0.0",
+    "psycopg2-binary>=2.9.0",
+    "plotly>=5.0.0",
+]
+
+vllm = [
+    # vLLM serving
+    "vllm>=0.4.0",
+    "accelerate>=0.25.0",
+]
+
+baselines = [
+    # Baseline methods
+    "func-timeout>=4.3.5",
+    "nltk>=3.7",
+    "rapidfuzz>=2.0.0",
+    "sqlparse>=0.4.0",
+    "sql-metadata>=2.8.0",
+    "datasets>=2.11.0",
+    "faiss-cpu>=1.7.0",
+]
+
+all = [
+    "spider2[dev,agent,vllm,baselines]",
+]
+
+[project.urls]
+Homepage = "https://spider2-sql.github.io/"
+Repository = "https://github.com/xlang-ai/Spider2"
+Documentation = "https://github.com/xlang-ai/Spider2"
+Paper = "https://arxiv.org/abs/2411.07763"
+
+[project.scripts]
+spider2-vllm = "start_vllm_qwen:serve"
+
+[tool.setuptools]
+py-modules = ["start_vllm_qwen"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["spider2*"]
+exclude = ["tests*", "docs*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "spider2-dbt/examples",
+    "spider2-lite/baselines",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
