@@ -1,0 +1,123 @@
+[START_DATABASE_SCHEMA]
+{{
+  "table_num": 5,
+  "tables": [
+    {{
+      "table_name": "documents",
+      "table_description": "Table to store details of each document uploaded to the platform.",
+      "column_names": ["doc_id", "doc_title", "doc_version", "site_id", "upload_date", "last_updated", "hits", "author_id"],
+      "column_types": ["INTEGER", "VARCHAR", "INTEGER", "INTEGER", "DATE", "DATE", "INTEGER", "INTEGER"],
+      "column_descriptions": [
+        "Unique identifier for each document",
+        "Title of the document",
+        "Version number of the document",
+        "Reference to the site or department where the document is hosted",
+        "Date the document was uploaded",
+        "Date the document was last updated",
+        "Number of views or hits the document has received",
+        "ID of the author who uploaded the document"
+      ],
+      "primary_key": ["doc_id"],
+      "sample_rows": [
+        [120983, "Canvas, How to Change the Course Name", 1, 101, "2022-08-01", "2022-08-31", 821, 3001],
+        [120334, "Contracts+ Using Jaggaer Word App", 1, 102, "2023-04-01", "2023-04-24", 822, 3002]
+      ]
+    }},
+    {{
+      "table_name": "sites",
+      "table_description": "Details of the sites or departments hosting the documents.",
+      "column_names": ["site_id", "site_name", "department", "contact_email"],
+      "column_types": ["INTEGER", "VARCHAR", "VARCHAR", "VARCHAR"],
+      "column_descriptions": [
+        "Unique identifier for each site",
+        "Name of the site or department",
+        "Department under which the site operates",
+        "Contact email for inquiries about the site"
+      ],
+      "primary_key": ["site_id"],
+      "sample_rows": [
+        [101, "University of Illinois Technology Services", "Technology Services", "techsupport@uillinois.edu"],
+        [102, "UI Training and Development Resources", "Training and Development", "train@uillinois.edu"]
+      ]
+    }},
+    {{
+      "table_name": "authors",
+      "table_description": "Information about the authors uploading the documents.",
+      "column_names": ["author_id", "author_name", "email", "department"],
+      "column_types": ["INTEGER", "VARCHAR", "VARCHAR", "VARCHAR"],
+      "column_descriptions": [
+        "Unique identifier for each author",
+        "Full name of the author",
+        "Email address of the author",
+        "Department the author belongs to"
+      ],
+      "primary_key": ["author_id"],
+      "sample_rows": [
+        [3001, "John Doe", "jdoe@uillinois.edu", "Technology Services"],
+        [3002, "Jane Smith", "jsmith@uillinois.edu", "Training and Development"]
+      ]
+    }},
+    {{
+      "table_name": "document_access",
+      "table_description": "Tracks access to documents by users.",
+      "column_names": ["access_id", "doc_id", "user_id", "access_date", "access_type"],
+      "column_types": ["INTEGER", "INTEGER", "INTEGER", "DATE", "VARCHAR"],
+      "column_descriptions": [
+        "Unique identifier for each access event",
+        "ID of the document being accessed",
+        "ID of the user accessing the document",
+        "Date when the document was accessed",
+        "Type of access (e.g., view, download)"
+      ],
+      "primary_key": ["access_id"],
+      "sample_rows": [
+        [5001, 120983, 4001, "2023-05-01", "view"],
+        [5002, 120334, 4002, "2023-05-02", "download"]
+      ]
+    }},
+    {{
+      "table_name": "users",
+      "table_description": "Details of users accessing the documents.",
+      "column_names": ["user_id", "user_name", "email", "role"],
+      "column_types": ["INTEGER", "VARCHAR", "VARCHAR", "VARCHAR"],
+      "column_descriptions": [
+        "Unique identifier for each user",
+        "Full name of the user",
+        "Email address of the user",
+        "Role of the user (e.g., student, staff, admin)"
+      ],
+      "primary_key": ["user_id"],
+      "sample_rows": [
+        [4001, "Alice Johnson", "alice.johnson@uillinois.edu", "student"],
+        [4002, "Bob Williams", "bob.williams@uillinois.edu", "staff"]
+      ]
+    }}
+  ]
+  "foreign_keys": [
+    {{
+      "source_table": "documents",
+      "column_in_source_table": "site_id",
+      "referenced_table": "sites",
+      "column_in_referenced_table": "site_id"
+    }},
+    {{
+      "source_table": "documents",
+      "column_in_source_table": "author_id",
+      "referenced_table": "authors",
+      "column_in_referenced_table": "author_id"
+    }},
+    {{
+      "source_table": "document_access",
+      "column_in_source_table": "doc_id",
+      "referenced_table": "documents",
+      "column_in_referenced_table": "doc_id"
+    }},
+    {{
+      "source_table": "document_access",
+      "column_in_source_table": "user_id",
+      "referenced_table": "users",
+      "column_in_referenced_table": "user_id"
+    }}
+  ]
+}}
+[END_DATABASE_SCHEMA]

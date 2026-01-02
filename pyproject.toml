@@ -94,10 +94,10 @@ Documentation = "https://github.com/xlang-ai/Spider2"
 Paper = "https://arxiv.org/abs/2411.07763"
 
 [project.scripts]
-spider2-vllm = "start_vllm_qwen:serve"
+spider2-vllm = "start_vllm:serve"
 
 [tool.setuptools]
-py-modules = ["start_vllm_qwen"]
+py-modules = ["start_vllm", "llm", "data_manipulation", "arctic", "db"]
 
 [tool.setuptools.packages.find]
 where = ["."]

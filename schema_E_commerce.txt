@@ -1,0 +1,286 @@
+{
+  "table_num": 11,
+  "tables": [
+    {
+      "table_name": "customers",
+      "table_description": "Table storing customer information including their location details.",
+      "column_names": ["customer_id", "customer_unique_id", "customer_zip_code_prefix", "customer_city", "customer_state"],
+      "column_types": ["TEXT", "TEXT", "INTEGER", "TEXT", "TEXT"],
+      "column_descriptions": [
+        "Unique identifier for each customer order (can repeat for same unique customer)",
+        "Unique identifier for each distinct customer across multiple orders",
+        "ZIP code prefix of the customer's address",
+        "City where the customer is located",
+        "State abbreviation where the customer is located"
+      ],
+      "primary_key": ["customer_id"],
+      "sample_rows": [
+        ["a1acf95041edd043087a040e89449636", "191525912e1a31a97bf8b481ce852f75", 11712, "praia grande", "SP"],
+        ["6b4e082b14e562a79465f516bd129f3b", "a45db9d0a5dcfbf97517132c9d7fe232", 41825, "salvador", "BA"]
+      ]
+    },
+    {
+      "table_name": "sellers",
+      "table_description": "Table storing seller/merchant information and their location.",
+      "column_names": ["seller_id", "seller_zip_code_prefix", "seller_city", "seller_state"],
+      "column_types": ["TEXT", "INTEGER", "TEXT", "TEXT"],
+      "column_descriptions": [
+        "Unique identifier for each seller",
+        "ZIP code prefix of the seller's location",
+        "City where the seller operates",
+        "State abbreviation where the seller operates"
+      ],
+      "primary_key": ["seller_id"],
+      "sample_rows": [
+        ["aced59e9d31ef866a94f9e7f29d8d418", 3306, "sao paulo", "SP"],
+        ["b5f49fe968dff6b112861e6cd8e192ef", 80710, "curitiba", "PR"]
+      ]
+    },
+    {
+      "table_name": "products",
+      "table_description": "Table containing product catalog with details about each product.",
+      "column_names": ["product_id", "product_category_name", "product_name_lenght", "product_description_lenght", "product_photos_qty", "product_weight_g", "product_length_cm", "product_height_cm", "product_width_cm"],
+      "column_types": ["TEXT", "TEXT", "REAL", "REAL", "REAL", "REAL", "REAL", "REAL", "REAL"],
+      "column_descriptions": [
+        "Unique identifier for each product",
+        "Category name of the product in Portuguese",
+        "Length of the product name in characters",
+        "Length of the product description in characters",
+        "Number of product photos available",
+        "Product weight in grams",
+        "Product length in centimeters",
+        "Product height in centimeters",
+        "Product width in centimeters"
+      ],
+      "primary_key": ["product_id"],
+      "sample_rows": [
+        ["5a49f099263e18cab64382c04cb76883", "relogios_presentes", 35.0, 538.0, 1.0, 467.0, 22.0, 13.0, 17.0],
+        ["537148287359f3f816095b3bfc368130", "cama_mesa_banho", 60.0, 340.0, 1.0, 3600.0, 35.0, 6.0, 25.0]
+      ]
+    },
+    {
+      "table_name": "product_category_name_translation",
+      "table_description": "Translation table mapping Portuguese product category names to English.",
+      "column_names": ["product_category_name", "product_category_name_english"],
+      "column_types": ["TEXT", "TEXT"],
+      "column_descriptions": [
+        "Product category name in Portuguese",
+        "Product category name in English"
+      ],
+      "primary_key": ["product_category_name"],
+      "sample_rows": [
+        ["ferramentas_jardim", "garden_tools"],
+        ["cama_mesa_banho", "bed_bath_table"]
+      ]
+    },
+    {
+      "table_name": "orders",
+      "table_description": "Table containing order header information with status and timestamps.",
+      "column_names": ["order_id", "customer_id", "order_status", "order_purchase_timestamp", "order_approved_at", "order_delivered_carrier_date", "order_delivered_customer_date", "order_estimated_delivery_date"],
+      "column_types": ["TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "TEXT"],
+      "column_descriptions": [
+        "Unique identifier for each order",
+        "Reference to the customer who placed the order",
+        "Current status of the order (e.g., delivered, shipped, canceled)",
+        "Timestamp when the order was purchased",
+        "Timestamp when the order payment was approved",
+        "Timestamp when the order was handed to the carrier",
+        "Timestamp when the order was delivered to the customer",
+        "Estimated delivery date shown to customer at purchase"
+      ],
+      "primary_key": ["order_id"],
+      "sample_rows": [
+        ["36496983bcef05ef8cf855bbcf5d23ab", "cbb8cc5d78799d889be9031df33c30dd", "delivered", "2018-03-09 11:28:21", "2018-03-10 03:48:47", "2018-03-13 19:34:36", "2018-03-26 19:44:42", "2018-04-04 00:00:00"],
+        ["ff64e0ba4800eb1127ac32aeac2b51f9", "16482587049b0c2a607dd532d0653696", "delivered", "2017-11-20 16:46:51", "2017-11-20 16:56:23", "2017-11-24 15:39:15", "2017-12-05 00:57:57", "2017-12-13 00:00:00"]
+      ]
+    },
+    {
+      "table_name": "order_items",
+      "table_description": "Table containing individual line items within each order.",
+      "column_names": ["order_id", "order_item_id", "product_id", "seller_id", "shipping_limit_date", "price", "freight_value"],
+      "column_types": ["TEXT", "INTEGER", "TEXT", "TEXT", "TEXT", "REAL", "REAL"],
+      "column_descriptions": [
+        "Reference to the parent order",
+        "Sequential item number within the order",
+        "Reference to the product being purchased",
+        "Reference to the seller fulfilling this item",
+        "Deadline for the seller to ship the item",
+        "Price of the item",
+        "Freight/shipping cost for this item"
+      ],
+      "primary_key": ["order_id", "order_item_id"],
+      "sample_rows": [
+        ["fd1dfd657df57a8183a8bd5ad5725538", 1, "4d8ea5149cb1949048b389bc23797fef", "aae3bfea055532c57fb453ed3ec80b30", "2017-03-07 23:50:10", 68.0, 11.09],
+        ["8842bee3797d9ac30486e0b26f5a9756", 1, "f72b7888719ff77bf96e14bc97b64430", "cfb1a033743668a192316f3c6d1d2671", "2018-03-05 04:15:43", 124.9, 14.27]
+      ]
+    },
+    {
+      "table_name": "order_payments",
+      "table_description": "Table containing payment information for each order.",
+      "column_names": ["order_id", "payment_sequential", "payment_type", "payment_installments", "payment_value"],
+      "column_types": ["TEXT", "INTEGER", "TEXT", "INTEGER", "REAL"],
+      "column_descriptions": [
+        "Reference to the order being paid",
+        "Sequential payment number if multiple payment methods used",
+        "Type of payment method (e.g., credit_card, boleto, voucher)",
+        "Number of installments for the payment",
+        "Value of this payment"
+      ],
+      "primary_key": ["order_id", "payment_sequential"],
+      "sample_rows": [
+        ["ee026f49fd0f7469eca393e46a073077", 1, "credit_card", 4, 74.63],
+        ["1ce630b94c04093fbbb40498068f46b0", 1, "boleto", 1, 189.0]
+      ]
+    },
+    {
+      "table_name": "order_reviews",
+      "table_description": "Table containing customer reviews for orders.",
+      "column_names": ["review_id", "order_id", "review_score", "review_comment_title", "review_comment_message", "review_creation_date", "review_answer_timestamp"],
+      "column_types": ["TEXT", "TEXT", "INTEGER", "TEXT", "TEXT", "TEXT", "TEXT"],
+      "column_descriptions": [
+        "Unique identifier for each review",
+        "Reference to the order being reviewed",
+        "Rating score from 1 to 5",
+        "Title of the review comment (optional)",
+        "Content of the review message (optional)",
+        "Date when the review was created",
+        "Timestamp when the review was answered/acknowledged"
+      ],
+      "primary_key": ["review_id"],
+      "sample_rows": [
+        ["c74b4e36cdad43707ec16b14a655ad4d", "b64c877d24e9ca2418150a159d754371", 5, null, "Nunca tive problemas super recomendado", "2018-02-23 00:00:00", "2018-02-26 12:38:17"],
+        ["d04bf0f58aec6ea447a3551b90f7c1dd", "f18cb9c90909f11a7adabc63fb188f19", 4, null, "Foi entregue apenas parte do pedido", "2017-10-25 00:00:00", "2017-10-25 12:01:32"]
+      ]
+    },
+    {
+      "table_name": "geolocation",
+      "table_description": "Table containing geographic coordinates for Brazilian ZIP code prefixes.",
+      "column_names": ["geolocation_zip_code_prefix", "geolocation_lat", "geolocation_lng", "geolocation_city", "geolocation_state"],
+      "column_types": ["INTEGER", "REAL", "REAL", "TEXT", "TEXT"],
+      "column_descriptions": [
+        "ZIP code prefix for the location",
+        "Latitude coordinate",
+        "Longitude coordinate",
+        "City name",
+        "State abbreviation"
+      ],
+      "primary_key": ["geolocation_zip_code_prefix"],
+      "sample_rows": [
+        [8900, -23.41703007438397, -46.03386496794391, "guararema", "SP"],
+        [18520, -23.159482222434374, -47.76046832976516, "cerquilho", "SP"]
+      ]
+    },
+    {
+      "table_name": "leads_qualified",
+      "table_description": "Table containing marketing qualified leads (MQL) - potential sellers.",
+      "column_names": ["mql_id", "first_contact_date", "landing_page_id", "origin"],
+      "column_types": ["TEXT", "TEXT", "TEXT", "TEXT"],
+      "column_descriptions": [
+        "Unique identifier for each marketing qualified lead",
+        "Date of first contact with the lead",
+        "ID of the landing page where the lead originated",
+        "Traffic source origin (e.g., organic_search, paid_search)"
+      ],
+      "primary_key": ["mql_id"],
+      "sample_rows": [
+        ["a7ad710353b08b3d1e7ee6daca9679cc", "2018-02-07", "0218f6be0b76aca72ab4d00ee9e8cf10", "organic_search"],
+        ["785f9daa6aedd3afc9ef23137a51fe3e", "2017-11-20", "b217afa2c1f4cb502423005639878f6d", "paid_search"]
+      ]
+    },
+    {
+      "table_name": "leads_closed",
+      "table_description": "Table containing closed/converted leads that became sellers.",
+      "column_names": ["mql_id", "seller_id", "sdr_id", "sr_id", "won_date", "business_segment", "lead_type", "lead_behaviour_profile", "has_company", "has_gtin", "average_stock", "business_type", "declared_product_catalog_size", "declared_monthly_revenue"],
+      "column_types": ["TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "INTEGER", "INTEGER", "TEXT", "TEXT", "REAL", "REAL"],
+      "column_descriptions": [
+        "Reference to the marketing qualified lead",
+        "Reference to the seller account created",
+        "Sales development representative ID who handled the lead",
+        "Sales representative ID who closed the deal",
+        "Date when the lead was won/converted",
+        "Business segment of the seller",
+        "Type of lead based on business size",
+        "Behavioral profile of the lead (e.g., cat, shark)",
+        "Whether the lead has a registered company (1=yes, 0=no)",
+        "Whether products have GTIN/barcode (1=yes, 0=no)",
+        "Average stock level range",
+        "Type of business (e.g., reseller, manufacturer)",
+        "Declared size of product catalog",
+        "Declared monthly revenue"
+      ],
+      "primary_key": ["mql_id"],
+      "sample_rows": [
+        ["0e327f32dbb22d433600688b7e9af0db", "cee4320453079d554562dee0753d7d43", "b34f6eba10f46bf9a657a01c108a8284", "068066e24f0c643eb1d089c7dd20cd73", "2018-08-21 21:07:30", "health_beauty", "online_medium", "shark", 1, 1, "5-20", "reseller", 500.0, 30000.0],
+        ["07e3b175a6c00f310d4e7e4b17df1304", "8ec9a02e1c573e5ebf9133968d9b0042", "9e4d1098a3b0f5da39b0bc48f9876645", "495d4e95a8cf8bbf8b432b612a2aa328", "2018-02-28 21:24:13", "home_office_furniture", "industry", "cat", null, null, null, "manufacturer", null, 0.0]
+      ]
+    }
+  ],
+  "foreign_keys": [
+    {
+      "source_table": "orders",
+      "column_in_source_table": "customer_id",
+      "referenced_table": "customers",
+      "column_in_referenced_table": "customer_id"
+    },
+    {
+      "source_table": "order_items",
+      "column_in_source_table": "order_id",
+      "referenced_table": "orders",
+      "column_in_referenced_table": "order_id"
+    },
+    {
+      "source_table": "order_items",
+      "column_in_source_table": "product_id",
+      "referenced_table": "products",
+      "column_in_referenced_table": "product_id"
+    },
+    {
+      "source_table": "order_items",
+      "column_in_source_table": "seller_id",
+      "referenced_table": "sellers",
+      "column_in_referenced_table": "seller_id"
+    },
+    {
+      "source_table": "order_payments",
+      "column_in_source_table": "order_id",
+      "referenced_table": "orders",
+      "column_in_referenced_table": "order_id"
+    },
+    {
+      "source_table": "order_reviews",
+      "column_in_source_table": "order_id",
+      "referenced_table": "orders",
+      "column_in_referenced_table": "order_id"
+    },
+    {
+      "source_table": "products",
+      "column_in_source_table": "product_category_name",
+      "referenced_table": "product_category_name_translation",
+      "column_in_referenced_table": "product_category_name"
+    },
+    {
+      "source_table": "leads_closed",
+      "column_in_source_table": "mql_id",
+      "referenced_table": "leads_qualified",
+      "column_in_referenced_table": "mql_id"
+    },
+    {
+      "source_table": "leads_closed",
+      "column_in_source_table": "seller_id",
+      "referenced_table": "sellers",
+      "column_in_referenced_table": "seller_id"
+    },
+    {
+      "source_table": "customers",
+      "column_in_source_table": "customer_zip_code_prefix",
+      "referenced_table": "geolocation",
+      "column_in_referenced_table": "geolocation_zip_code_prefix"
+    },
+    {
+      "source_table": "sellers",
+      "column_in_source_table": "seller_zip_code_prefix",
+      "referenced_table": "geolocation",
+      "column_in_referenced_table": "geolocation_zip_code_prefix"
+    }
+  ]
+}
